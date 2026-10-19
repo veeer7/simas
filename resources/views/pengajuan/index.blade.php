@@ -1,109 +1,109 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Daftar Pengajuan Surat
-            </h2>
-            @can('create', App\Models\PengajuanSurat::class)
-                <a href="{{ route('pengajuan.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">
-                    <x-heroicon-o-plus class="w-4 h-4" />
-                    Buat Pengajuan
-                </a>
-            @endcan
+<x-app-layout title="Pengajuan Surat">
+    @php
+        $isAdmin = \App\Support\Peran::isAdmin();
+        $items   = $pengajuans ?? $pengajuanSurats ?? $pengajuan ?? $data ?? null;
+        \Carbon\Carbon::setLocale('id');
+    @endphp
+
+    <div class="top">
+        <div>
+            <h1>Pengajuan Surat</h1>
+            <p class="sub">Daftar surat tugas dan pengajuan kegiatan</p>
         </div>
-    </x-slot>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+            @if($isAdmin)
+                <form method="POST" action="{{ route('pengajuan.hapus-draft') }}"
+                      onsubmit="return confirm('Hapus SEMUA pengajuan berstatus Draft? Tidak bisa dikembalikan.')">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="btn btn-ghost" style="color:#dc2626;border-color:#fecaca">Hapus semua draft</button>
+                </form>
+            @endif
+            <a href="{{ route('pengajuan.create') }}" class="btn btn-primary">+ Buat Pengajuan</a>
+        </div>
+    </div>
 
-    <div class="py-6">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+    @if(session('error'))
+        <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:12px 16px;border-radius:12px;margin-bottom:20px;font-size:14px">
+            {{ session('error') }}
+        </div>
+    @endif
 
-            <form method="GET" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <input type="text" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Cari Nomor / Kegiatan..." class="rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+    <form method="GET" class="filters">
+        <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari nomor / kegiatan...">
+        <select name="status">
+            <option value="">Semua status</option>
+            @foreach(['draft' => 'Draft', 'diajukan' => 'Diajukan', 'diproses' => 'Diproses', 'revisi' => 'Revisi', 'disetujui' => 'Disetujui', 'ditolak' => 'Ditolak'] as $v => $l)
+                <option value="{{ $v }}" @selected(request('status') === $v)>{{ $l }}</option>
+            @endforeach
+        </select>
+        <input type="date" name="dari" value="{{ request('dari') }}">
+        <input type="date" name="sampai" value="{{ request('sampai') }}">
+        <button class="btn btn-primary">Filter</button>
+        @if(request()->hasAny(['search','status','dari','sampai']))
+            <a href="{{ route('pengajuan.index') }}" class="btn btn-ghost">Reset</a>
+        @endif
+    </form>
 
-                    <select name="status"
-                        class="rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
-                        <option value="">Semua Status</option>
-                        @foreach(\App\Enums\StatusPengajuan::cases() as $s)
-                            <option value="{{ $s->value }}" @selected(($filters['status'] ?? '') === $s->value)>
-                                {{ $s->label() }}
-                            </option>
-                        @endforeach
-                    </select>
-
-                    <input type="date" name="dari" value="{{ $filters['dari'] ?? '' }}" class="rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
-
-                    <div class="flex gap-2">
-                        <input type="date" name="sampai" value="{{ $filters['sampai'] ?? '' }}" class="flex-1 rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
-                        <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white text-sm rounded-lg transition">
-                            Filter
-                        </button>
-                    </div>
-                </div>
-            </form>
-
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300">
+    <div class="card" style="padding:8px 18px">
+        @if($items && $items->count())
+            <div class="table-wrap">
+                <table>
+                    <thead>
                         <tr>
-                            <th class="px-4 py-3 text-left">Nomor</th>
-                            <th class="px-4 py-3 text-left">Pengaju</th>
-                            <th class="px-4 py-3 text-left">Kegiatan</th>
-                            <th class="px-4 py-3 text-left">Tgl Pelaksanaan</th>
-                            <th class="px-4 py-3 text-left">Status</th>
-                            <th class="px-4 py-3 text-right">Aksi</th>
+                            <th>Nomor</th>
+                            <th>Pengaju</th>
+                            <th>Kegiatan</th>
+                            <th>Tgl Pelaksanaan</th>
+                            <th>Status</th>
+                            <th style="text-align:right">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                        @forelse($pengajuan as $p)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                <td class="px-4 py-3">
-                                    <div class="font-medium text-gray-900 dark:text-gray-100">
-                                        {{ $p->nomor_pengajuan }}
-                                    </div>
-                                    @if($p->nomor_surat)
-                                        <div class="text-xs text-gray-500">
-                                            Surat: {{ $p->nomor_surat }}
-                                        </div>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                                    {{ $p->user->name }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <div class="text-gray-900 dark:text-gray-100">{{ $p->nama_kegiatan }}</div>
-                                    <div class="text-xs text-gray-500">{{ $p->jenis_surat }}</div>
-                                </td>
-                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                                    {{ $p->tanggal_pelaksanaan->format('d M Y') }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <x-pengajuan.status-badge :status="$p->status" />
-                                </td>
-                                <td class="px-4 py-3 text-right">
-                                    <a href="{{ route('pengajuan.show', $p) }}"
-                                       class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                        Detail
-                                    </a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6">
-                                    <x-empty-state
-                                        title="Belum Ada Pengajuan"
-                                        description="Mulai Dengan Membuat Pengajuan Surat Pertama Anda"
-                                        action-label="Buat Pengajuan"
-                                        action-url="{{ route('pengajuan.create') }}" />
-                                </td>
-                            </tr>
-                        @endforelse
+                    <tbody>
+                    @foreach($items as $p)
+                        @php
+                            $nomor = $p->nomor_pengajuan ?? $p->nomor ?? ('#'.$p->id);
+                            $jenis = $p->blanko->nama ?? $p->blanko->nama_blanko ?? $p->jenis_surat ?? null;
+                            $tgl   = $p->tanggal_pelaksanaan ?? null;
+                        @endphp
+                        <tr>
+                            <td style="white-space:nowrap">
+                                <b>{{ $nomor }}</b>
+                                @if(!empty($p->nomor_surat))
+                                    <div style="font-size:12px;color:#6b7280">Surat: {{ $p->nomor_surat }}</div>
+                                @endif
+                            </td>
+                            <td>{{ $p->user->name ?? '-' }}</td>
+                            <td>
+                                {{ $p->nama_kegiatan ?? '-' }}
+                                @if($jenis)
+                                    <div style="font-size:12px;color:#6b7280">{{ $jenis }}</div>
+                                @endif
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ $tgl ? \Carbon\Carbon::parse($tgl)->translatedFormat('d M Y') : '-' }}
+                            </td>
+                            <td><x-pengajuan.status-badge :status="$p->status" /></td>
+                            <td style="text-align:right;white-space:nowrap">
+                                <a href="{{ route('pengajuan.show', $p) }}" class="btn btn-ghost" style="padding:6px 14px">Detail</a>
+                                @if($isAdmin)
+                                    <form method="POST" action="{{ route('pengajuan.hapus', $p) }}" style="display:inline"
+                                          onsubmit="return confirm('Hapus pengajuan ini? Tidak bisa dikembalikan.')">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="btn btn-ghost" style="padding:6px 14px;color:#dc2626;border-color:#fecaca">Hapus</button>
+                                    </form>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
                     </tbody>
                 </table>
             </div>
 
-            <div class="mt-4">
-                {{ $pengajuan->links() }}
-            </div>
-        </div>
+            @if(method_exists($items, 'links'))
+                <div style="padding:14px 0">{{ $items->withQueryString()->links() }}</div>
+            @endif
+        @else
+            <div class="empty">Belum ada pengajuan.</div>
+        @endif
     </div>
 </x-app-layout>

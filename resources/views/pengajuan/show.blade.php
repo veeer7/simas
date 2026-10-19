@@ -1,204 +1,114 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200">
-                Detail Pengajuan
-            </h2>
-            <a href="{{ route('pengajuan.index') }}" class="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400">
-                ← Kembali
-            </a>
+<x-app-layout title="Detail Pengajuan">
+    @php
+        $isAdmin = \App\Support\Peran::isAdmin();
+        $nomor   = $pengajuan->nomor_pengajuan ?? $pengajuan->nomor ?? '#'.$pengajuan->id;
+        $statusRaw = $pengajuan->status;
+        if (is_object($statusRaw)) { $statusRaw = $statusRaw->value ?? $statusRaw->name ?? ''; }
+        $status  = strtolower((string) $statusRaw);
+        $final   = in_array($status, ['disetujui', 'approved', 'ditolak', 'rejected', 'draft']);
+        $alasanTolak = $pengajuan->alasan_penolakan ?? $pengajuan->alasan ?? $pengajuan->catatan ?? null;
+        $tgl = $pengajuan->tanggal_pelaksanaan ?? null;
+        if ($tgl) { $tgl = \Carbon\Carbon::parse($tgl)->locale('id')->translatedFormat('l, d F Y'); }
+        $waktu = trim(($pengajuan->waktu_mulai ?? '') . ($pengajuan->waktu_selesai ? ' - ' . $pengajuan->waktu_selesai : ''));
+    @endphp
+
+    <style>
+        dialog.modal{border:0;border-radius:16px;padding:26px;width:min(460px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.2)}
+        dialog.modal::backdrop{background:rgba(17,24,39,.45)}
+        dialog.modal h3{margin:0 0 14px;font-size:18px}
+        dialog.modal textarea{min-height:110px}
+        .row-btn{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+        .btn-orange{background:#ea580c;color:#fff}.btn-orange:hover{background:#c2410c}
+        .btn-blue{background:#2563eb;color:#fff}.btn-blue:hover{background:#1d4ed8}
+    </style>
+
+    <div class="top">
+        <div>
+            <h1>Detail Pengajuan</h1>
+            <p class="sub">Nomor: <b>{{ $nomor }}</b> &nbsp; <x-pengajuan.status-badge :status="$pengajuan->status" /></p>
         </div>
-    </x-slot>
-
-    <div class="py-6">
-        <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-6">
-
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <div class="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                        <div class="text-xs text-gray-500 uppercase">Nomor Pengajuan</div>
-                        <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                            {{ $pengajuan->nomor_pengajuan }}
-                        </div>
-                        @if($pengajuan->nomor_surat)
-                            <div class="mt-2 text-xs text-gray-500 uppercase">Nomor Surat</div>
-                            <div class="font-mono text-gray-800 dark:text-gray-200">
-                                {{ $pengajuan->nomor_surat }}
-                            </div>
-                        @endif
-                    </div>
-                    <x-pengajuan.status-badge :status="$pengajuan->status" />
-                </div>
-            </div>
-
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-4">Informasi Pengajuan</h3>
-                <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <dt class="text-gray-500">Pengaju</dt>
-                        <dd class="text-gray-900 dark:text-gray-100 font-medium">
-                            {{ $pengajuan->user->name }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-gray-500">Jenis Surat</dt>
-                        <dd class="text-gray-900 dark:text-gray-100">{{ $pengajuan->jenis_surat }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-gray-500">Nama Kegiatan</dt>
-                        <dd class="text-gray-900 dark:text-gray-100">{{ $pengajuan->nama_kegiatan }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-gray-500">Tanggal Pelaksanaan</dt>
-                        <dd class="text-gray-900 dark:text-gray-100">
-                            {{ $pengajuan->tanggal_pelaksanaan->translatedFormat('d F Y') }}
-                            @if($pengajuan->waktu_mulai)
-                                , {{ $pengajuan->waktu_mulai }}–{{ $pengajuan->waktu_selesai }}
-                            @endif
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-gray-500">Tempat</dt>
-                        <dd class="text-gray-900 dark:text-gray-100">{{ $pengajuan->tempat ?? '-' }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-gray-500">Blanko</dt>
-                        <dd class="text-gray-900 dark:text-gray-100">
-                            {{ $pengajuan->blanko->nama }}
-                        </dd>
-                    </div>
-                    @if($pengajuan->keterangan)
-                        <div class="md:col-span-2">
-                            <dt class="text-gray-500">Keterangan</dt>
-                            <dd class="text-gray-900 dark:text-gray-100">{{ $pengajuan->keterangan }}</dd>
-                        </div>
-                    @endif
-                </dl>
-            </div>
-
-            @if($pengajuan->lampiran->count())
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Lampiran</h3>
-                    <ul class="space-y-2">
-                        @foreach($pengajuan->lampiran as $lap)
-                            <li class="flex items-center gap-3 text-sm">
-                                <x-heroicon-o-paper-clip class="w-4 h-4 text-gray-400" />
-                                <a href="{{ $lap->url() }}" target="_blank" class="text-blue-600 hover:underline flex-1">
-                                    {{ $lap->nama_file }}
-                                </a>
-                                <span class="text-gray-400 text-xs">{{ $lap->ukuranFormat() }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            @include('pengajuan.partials.timeline', ['pengajuan' => $pengajuan])
-
-            @if(auth()->id() === $pengajuan->user_id)
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex flex-wrap gap-3">
-                    @if($pengajuan->bisaDiedit())
-                        <a href="{{ route('pengajuan.edit', $pengajuan) }}" class="px-4 py-2 text-sm rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white">
-                            Edit Draft
-                        </a>
-                    @endif
-
-                    @if($pengajuan->bisaDiajukan())
-                        <form action="{{ route('pengajuan.submit', $pengajuan) }}" method="POST" onsubmit="return confirm('Ajukan Pengajuan Ini?')">
-                            @csrf
-                            <button class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
-                                Ajukan Sekarang
-                            </button>
-                        </form>
-                    @endif
-
-                    @if($pengajuan->bisaDihapus())
-                        <form action="{{ route('pengajuan.destroy', $pengajuan) }}" method="POST" onsubmit="return confirm('Hapus Pengajuan Ini?')">
-                            @csrf @method('DELETE')
-                            <button class="px-4 py-2 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white">
-                                Hapus
-                            </button>
-                        </form>
-                    @endif
-
-                    @if($pengajuan->sudahDisetujui())
-                        <a href="{{ route('pengajuan.pdf', $pengajuan) }}" class="px-4 py-2 text-sm rounded-lg bg-green-600 hover:bg-green-700 text-white">
-                            Download PDF
-                        </a>
-                    @endif
-                </div>
-            @endif
-
-            @if(in_array(auth()->user()->role?->name, ['admin_tu', 'pimpinan']))
-                @php
-                    $bisaAksi = ($pengajuan->current_step === 1 && auth()->user()->isAdminTu()) || ($pengajuan->current_step === 2 && auth()->user()->isPimpinan());
-                @endphp
-
-                @if($bisaAksi)
-                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6" x-data="{ modal: null }">
-                        <h3 class="font-medium mb-3">Aksi Anda</h3>
-                        <div class="flex flex-wrap gap-2">
-                            <button @click="modal = 'approve'" class="px-4 py-2 text-sm rounded-lg bg-green-600 hover:bg-green-700 text-white">
-                                {{ $pengajuan->current_step === 1 ? 'Verifikasi & Teruskan' : 'Setujui Final' }}
-                            </button>
-                            <button @click="modal = 'revisi'" class="px-4 py-2 text-sm rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white">
-                                Minta Revisi
-                            </button>
-                            <button @click="modal = 'reject'" class="px-4 py-2 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white">
-                                Tolak
-                            </button>
-                        </div>
-
-                        <div x-show="modal === 'approve'" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div @click.outside="modal = null" class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-                                <h4 class="font-medium mb-3">Konfirmasi</h4>
-                                <form method="POST" action="{{ $pengajuan->current_step === 1 ? route('approval.verify', $pengajuan) : route('approval.approve', $pengajuan) }}">
-                                    @csrf
-                                    <textarea name="catatan" rows="3" placeholder="Catatan (Opsional)" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 mb-3"></textarea>
-                                    <div class="flex justify-end gap-2">
-                                        <button type="button" @click="modal = null" class="px-3 py-2 text-sm rounded-lg border">Batal</button>
-                                        <button class="px-3 py-2 text-sm rounded-lg bg-green-600 text-white">
-                                            Konfirmasi
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-
-                        <div x-show="modal === 'revisi'" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div @click.outside="modal = null" class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-                                <h4 class="font-medium mb-3">Minta Revisi</h4>
-                                <form method="POST" action="{{ route('approval.revisi', $pengajuan) }}">
-                                    @csrf
-                                    <textarea name="catatan" rows="3" required placeholder="Catatan Revisi" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 mb-3"></textarea>
-                                    <div class="flex justify-end gap-2">
-                                        <button type="button" @click="modal = null" class="px-3 py-2 text-sm rounded-lg border">Batal</button>
-                                        <button class="px-3 py-2 text-sm rounded-lg bg-yellow-500 text-white">
-                                            Kirim
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-
-                        <div x-show="modal === 'reject'" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div @click.outside="modal = null" class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-                                <h4 class="font-medium mb-3">Tolak Pengajuan</h4>
-                                <form method="POST" action="{{ route('approval.reject', $pengajuan) }}">
-                                    @csrf
-                                    <textarea name="catatan" rows="3" required placeholder="Alasan Penolakan" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 mb-3"></textarea>
-                                    <div class="flex justify-end gap-2">
-                                        <button type="button" @click="modal = null" class="px-3 py-2 text-sm rounded-lg border">Batal</button>
-                                        <button class="px-3 py-2 text-sm rounded-lg bg-red-600 text-white">
-                                            Tolak
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                @endif
-            @endif
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <a href="{{ route('pengajuan.index') }}" class="btn btn-ghost">← Kembali</a>
+            <a href="{{ route('pengajuan.pdf', $pengajuan) }}" target="_blank" class="btn btn-ghost">Buka PDF / Print</a>
         </div>
     </div>
+
+    @if($alasanTolak && in_array($status, ['ditolak','rejected','revisi']))
+        <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:14px 18px;border-radius:12px;margin-bottom:20px;font-size:14px">
+            <b>Alasan {{ $status === 'revisi' ? 'revisi' : 'penolakan' }}:</b> {{ $alasanTolak }}
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:12px 16px;border-radius:12px;margin-bottom:20px;font-size:14px">
+            {{ $errors->first() }}
+        </div>
+    @endif
+
+    <div class="card" style="margin-bottom:22px">
+        <b style="font-size:16px;display:block;margin-bottom:16px">Informasi Pengajuan</b>
+        <dl class="detail">
+            <dt>Pengaju</dt><dd>{{ $pengajuan->user->name ?? '-' }}</dd>
+            <dt>Nama kegiatan</dt><dd>{{ $pengajuan->nama_kegiatan ?? '-' }}</dd>
+            <dt>Tanggal pelaksanaan</dt><dd>{{ $tgl ?? '-' }}</dd>
+            <dt>Waktu</dt><dd>{{ $waktu ?: '-' }}</dd>
+            <dt>Tempat</dt><dd>{{ $pengajuan->tempat ?? '-' }}</dd>
+            <dt>Keterangan</dt><dd>{{ $pengajuan->keterangan ?? '-' }}</dd>
+        </dl>
+    </div>
+
+    {{-- ===== AKSI ADMIN ===== --}}
+    @if($isAdmin && !$final)
+        <div class="card" style="margin-bottom:22px">
+            <b style="font-size:16px;display:block;margin-bottom:14px">Tindakan Admin</b>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <form method="POST" action="{{ route('approval.verify', $pengajuan) }}">
+                    @csrf <button class="btn btn-blue">Verifikasi</button>
+                </form>
+                <form method="POST" action="{{ route('approval.approve', $pengajuan) }}"
+                      onsubmit="return confirm('Setujui pengajuan ini?')">
+                    @csrf <button class="btn btn-green">Setujui</button>
+                </form>
+                <button type="button" class="btn btn-orange" onclick="document.getElementById('dlgRevisi').showModal()">Minta Revisi</button>
+                <button type="button" class="btn btn-red" onclick="document.getElementById('dlgTolak').showModal()">Tolak</button>
+            </div>
+        </div>
+    @endif
+
+    {{-- Guru: kirim pengajuan yang masih draft --}}
+    @if(!$isAdmin && $status === 'draft')
+        <div class="card" style="margin-bottom:22px">
+            <form method="POST" action="{{ route('pengajuan.submit', $pengajuan) }}">
+                @csrf <button class="btn btn-primary">Kirim Pengajuan</button>
+            </form>
+        </div>
+    @endif
+
+    {{-- ===== POPUP TOLAK ===== --}}
+    <dialog id="dlgTolak" class="modal">
+        <form method="POST" action="{{ route('approval.reject', $pengajuan) }}">
+            @csrf
+            <h3>Tolak Pengajuan</h3>
+            <label>Alasan penolakan</label>
+            <textarea name="alasan" required placeholder="Tulis alasan penolakan..."></textarea>
+            <div class="row-btn">
+                <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">Batal</button>
+                <button type="submit" class="btn btn-red">Tolak</button>
+            </div>
+        </form>
+    </dialog>
+
+    {{-- ===== POPUP REVISI ===== --}}
+    <dialog id="dlgRevisi" class="modal">
+        <form method="POST" action="{{ route('approval.revisi', $pengajuan) }}">
+            @csrf
+            <h3>Minta Revisi</h3>
+            <label>Catatan revisi</label>
+            <textarea name="alasan" required placeholder="Apa yang perlu diperbaiki..."></textarea>
+            <div class="row-btn">
+                <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">Batal</button>
+                <button type="submit" class="btn btn-orange">Kirim Revisi</button>
+            </div>
+        </form>
+    </dialog>
 </x-app-layout>
